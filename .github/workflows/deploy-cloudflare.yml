@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 升级 Node.js 到 22，满足 Wrangler 的硬性要求
+      # 1. 环境准备：拉高到 Node 22，适配新版 Wrangler 编译器
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,18 +27,18 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
-      # 2. 核心大招：在部署前，利用 sed 命令强行把 wrangler.toml 里的 kv_namespaces 配置全部抹去
-      # 这样既不需要动脑筋配 KV，也不会再触发 Cloudflare 的 KV 校验报错
-      - name: Remove KV configuration from wrangler.toml
+      # 2. 预处理：同时干掉 wrangler.toml 里的 KV 命名空间和旧的 main 入口指向，防止其干扰构建
+      - name: Fix wrangler.toml configuration
         run: |
           sed -i '/kv_namespaces/,/\]/d' wrangler.toml
           echo "==== Modified wrangler.toml ===="
           cat wrangler.toml
 
-      # 3. 执行纯净部署
+      # 3. 部署动作：直接将打包命令交给官方自带的 worker-build，并将入口直接指向编译后的单文件
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy src/index.ts --name rsshub
+          # 核心修正：直接使用编译生成的产物作为部署入口，彻底解决 [custom build] 完找不到 src/index.ts 的报错
+          command: deploy dist-worker/index.mjs --name rsshub
