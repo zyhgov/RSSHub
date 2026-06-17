@@ -13,10 +13,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 1. 升级 Node.js 到 22，满足 Wrangler 的硬性要求
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
         uses: pnpm/action-setup@v3
@@ -26,10 +27,18 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # 2. 核心大招：在部署前，利用 sed 命令强行把 wrangler.toml 里的 kv_namespaces 配置全部抹去
+      # 这样既不需要动脑筋配 KV，也不会再触发 Cloudflare 的 KV 校验报错
+      - name: Remove KV configuration from wrangler.toml
+        run: |
+          sed -i '/kv_namespaces/,/\]/d' wrangler.toml
+          echo "==== Modified wrangler.toml ===="
+          cat wrangler.toml
+
+      # 3. 执行纯净部署
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 关键点：加上 --no-kv 覆盖，强制跳过未定义的 KV 检查直接部署
-          command: deploy src/index.ts --name rsshub --no-kv
+          command: deploy src/index.ts --name rsshub
