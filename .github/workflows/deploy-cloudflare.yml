@@ -3,8 +3,8 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches:
-      - master # 当你修改 master 分支代码时触发部署
-  workflow_dispatch: # 允许你在 Actions 页面手动点击按钮触发部署
+      - master
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -31,4 +31,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy src/index.ts --name rsshub
+          # 关键点：加上 --no-kv 覆盖，强制跳过未定义的 KV 检查直接部署
+          command: deploy src/index.ts --name rsshub --no-kv
